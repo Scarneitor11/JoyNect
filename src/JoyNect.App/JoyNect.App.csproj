@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>JoyNect.App</RootNamespace>
+    <AssemblyName>JoyNect</AssemblyName>
+    <IsPackable>false</IsPackable>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>assets\app.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" />
+    <PackageReference Include="Hardcodet.NotifyIcon.Wpf" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.Extensions.Logging" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\JoyNect.Core\JoyNect.Core.csproj" />
+  </ItemGroup>
+
+  <!-- Bundled fonts (SIL Open Font License) and generated icon geometry. -->
+  <ItemGroup>
+    <Resource Include="assets\fonts\*.ttf" />
+    <Resource Include="assets\icons.gen.xaml" Condition="Exists('assets\icons.gen.xaml')" />
+  </ItemGroup>
+
+</Project>

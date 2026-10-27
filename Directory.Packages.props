@@ -1,0 +1,38 @@
+<Project>
+
+  <!--
+    Central package management: every version is pinned here and nowhere else.
+
+    Licensing note: everything below is MIT/Apache-2.0 except the test stack, which is Apache-2.0.
+    FluentAssertions is deliberately NOT used (v8 relicensed to a paid model).
+  -->
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Controller I/O: pure managed HID (no native DLL, no build toolchain required). -->
+    <PackageVersion Include="HidSharp" Version="2.6.4" />
+
+    <!-- Virtual Xbox 360 pad. Embeds its own native ViGEmClient (Costura), so the app ships no native binaries. -->
+    <PackageVersion Include="Nefarius.ViGEm.Client" Version="1.21.256" />
+
+    <!-- MVVM source generators (ObservableProperty/RelayCommand). -->
+    <PackageVersion Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+
+    <!-- First-party runtime services. -->
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
+    <PackageVersion Include="Microsoft.Extensions.Logging" Version="8.0.1" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Console" Version="8.0.1" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.3" />
+
+    <!-- Tray icon plumbing. -->
+    <PackageVersion Include="Hardcodet.NotifyIcon.Wpf" Version="2.0.1" />
+
+    <!-- Test stack. -->
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.11.0" />
+    <PackageVersion Include="xunit" Version="2.9.3" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
+  </ItemGroup>
+
+</Project>
