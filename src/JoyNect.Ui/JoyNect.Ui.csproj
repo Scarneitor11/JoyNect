@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>JoyNect.Ui</RootNamespace>
+    <AssemblyName>JoyNect.Ui</AssemblyName>
+    <Description>JoyNect's Material 3 Expressive design system and screens.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\JoyNect.Core\JoyNect.Core.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -10,6 +10,9 @@
     <IsPackable>false</IsPackable>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>assets\app.ico</ApplicationIcon>
+
+    <!-- The window and every control are built in code, so there is no App.xaml to compile. -->
+    <EnableDefaultApplicationDefinition>false</EnableDefaultApplicationDefinition>
   </PropertyGroup>
 
   <ItemGroup>
@@ -21,11 +24,14 @@
 
   <ItemGroup>
     <ProjectReference Include="..\JoyNect.Core\JoyNect.Core.csproj" />
+    <ProjectReference Include="..\JoyNect.Ui\JoyNect.Ui.csproj" />
   </ItemGroup>
 
-  <!-- Bundled fonts (SIL Open Font License) and generated icon geometry. -->
+  <!-- The window and tray icons are WPF resources: the pack URI in the window and the tray needs
+       them embedded, not just used as the executable's icon. -->
   <ItemGroup>
-    <Resource Include="assets\fonts\*.ttf" />
+    <Resource Include="assets\app.png" />
+    <Resource Include="assets\app.ico" />
     <Resource Include="assets\icons.gen.xaml" Condition="Exists('assets\icons.gen.xaml')" />
   </ItemGroup>
 
