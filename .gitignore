@@ -31,6 +31,9 @@ coverage*.json
 
 ## Release artifacts (self-contained publish + repo metadata)
 artifacts/JoyNect-*-win-*
+*.zip
+artifacts/JoyNect-1.0.0-win-x64.zip
+publishes/
 *.png
 
 ## OS noise
