@@ -101,6 +101,10 @@ dotnet test JoyNect.sln -c Release
 
 The app project is Windows-only by design, because it depends on WPF, the HID stack, and ViGEmBus.
 
+`JoyNect.App` builds from the repository because its icon resources are optional. `assets/app.ico` is
+the app icon and the tray icon source; `assets/app.png` is an optional tray image that the build will
+skip if it is absent. If you clone the repo and only have the icon file, the app still builds.
+
 ## Repository layout
 
 - `src/JoyNect.App` — desktop application.

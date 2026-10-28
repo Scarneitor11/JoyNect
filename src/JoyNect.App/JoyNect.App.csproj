@@ -10,6 +10,8 @@
     <IsPackable>false</IsPackable>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>assets\app.ico</ApplicationIcon>
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <PublishTrimmed>false</PublishTrimmed>
 
     <!-- The window and every control are built in code, so there is no App.xaml to compile. -->
     <EnableDefaultApplicationDefinition>false</EnableDefaultApplicationDefinition>
@@ -28,9 +30,13 @@
   </ItemGroup>
 
   <!-- The window and tray icons are WPF resources: the pack URI in the window and the tray needs
-       them embedded, not just used as the executable's icon. -->
+       them embedded, not just used as the executable's icon.
+
+       The app icon and the tray icon source are optional in the repository: the published build can
+       run without app.png if the app icon is embedded in app.ico. The tray control falls back to
+       the icon file if the image is absent, so a stripped checkout still builds. -->
   <ItemGroup>
-    <Resource Include="assets\app.png" />
+    <Resource Include="assets\app.png" Condition="Exists('assets\app.png')" />
     <Resource Include="assets\app.ico" />
     <Resource Include="assets\icons.gen.xaml" Condition="Exists('assets\icons.gen.xaml')" />
   </ItemGroup>
