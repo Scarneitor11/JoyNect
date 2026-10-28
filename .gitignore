@@ -29,16 +29,17 @@ coverage*.xml
 coverage*.json
 *.received.*
 
-## Runtime artifacts we generate (logs, recordings, screenshots)
-artifacts/
-screenshots/*.png
-*.sbrec
-*.sbdump
+## Release artifacts (self-contained publish + repo metadata)
+artifacts/JoyNect-*-win-*
+*.png
 
 ## OS noise
 Thumbs.db
 desktop.ini
 .DS_Store
 
-# Dev-only tooling
+# Dev-only tooling (tools/ runs out of a local virtual environment; .env holds credentials)
 node_modules/
+.venv/
+__pycache__/
+.env
