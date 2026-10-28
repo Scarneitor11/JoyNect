@@ -39,3 +39,6 @@ screenshots/*.png
 Thumbs.db
 desktop.ini
 .DS_Store
+
+# Dev-only tooling
+node_modules/
