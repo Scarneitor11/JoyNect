@@ -1,0 +1,12 @@
+{
+  "name": "joynect-color-reference",
+  "private": true,
+  "description": "Generates Material 3 colour fixtures with the official Material Color Utilities, used to verify JoyNect's C# port.",
+  "type": "module",
+  "scripts": {
+    "generate": "node generate-fixtures.mjs"
+  },
+  "dependencies": {
+    "@material/material-color-utilities": "0.3.0"
+  }
+}
