@@ -5,6 +5,9 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace JoyNect.Core.Hid;
 
+/// <summary>A HID interface together with the handle needed to open it.</summary>
+public sealed record HidDeviceMatch(HidDevice Device, HidCandidate Candidate);
+
 /// <summary>
 /// Finds the HID interfaces that could be Switch controllers.
 /// </summary>
@@ -22,43 +25,37 @@ public sealed class DeviceEnumerator
     }
 
     /// <summary>Enumerates every Nintendo-vendor HID interface currently present.</summary>
-    public IReadOnlyList<HidCandidate> EnumerateCandidates()
-    {
-        var results = new List<HidCandidate>();
-
-        foreach (var device in EnumerateHidDevices())
-        {
-            // Nintendo's vendor id is the only pre-filter. Product ids are compared against the
-            // known table later, but an unknown product id is still returned here: newer
-            // controllers reuse the vendor id, and the protocol handshake is the real identity check.
-            var candidate = Describe(device, requireNintendoVendorId: true);
-            if (candidate is not null)
-            {
-                results.Add(candidate);
-            }
-        }
-
-        return results;
-    }
+    public IReadOnlyList<HidCandidate> EnumerateCandidates() =>
+        EnumerateMatches(requireNintendoVendorId: true).Select(m => m.Candidate).ToArray();
 
     /// <summary>
     /// Enumerates every HID interface on the machine, not just Nintendo's.
     /// </summary>
     /// <remarks>Used by the diagnostics page to prove that HID enumeration itself works.</remarks>
-    public IReadOnlyList<HidCandidate> EnumerateAll()
+    public IReadOnlyList<HidCandidate> EnumerateAll() =>
+        EnumerateMatches(requireNintendoVendorId: false).Select(m => m.Candidate).ToArray();
+
+    /// <summary>Enumerates candidates together with the devices needed to open them.</summary>
+    public IReadOnlyList<HidDeviceMatch> EnumerateMatches(bool requireNintendoVendorId = true)
     {
-        var results = new List<HidCandidate>();
+        var results = new List<HidDeviceMatch>();
+
         foreach (var device in EnumerateHidDevices())
         {
-            var candidate = Describe(device, requireNintendoVendorId: false);
+            var candidate = Describe(device, requireNintendoVendorId);
             if (candidate is not null)
             {
-                results.Add(candidate);
+                results.Add(new HidDeviceMatch(device, candidate));
             }
         }
 
         return results;
     }
+
+    /// <summary>Groups the candidates that belong to the same physical controller.</summary>
+    public static IReadOnlyList<IGrouping<string, HidCandidate>> GroupByPhysicalDevice(
+        IEnumerable<HidCandidate> candidates) =>
+        candidates.GroupBy(c => c.PhysicalDeviceKey, StringComparer.OrdinalIgnoreCase).ToArray();
 
     /// <summary>Raw HID enumeration; separated so failures are reported once and clearly.</summary>
     public IReadOnlyList<HidDevice> EnumerateHidDevices()
@@ -73,11 +70,6 @@ public sealed class DeviceEnumerator
             return [];
         }
     }
-
-    /// <summary>Groups the candidates that belong to the same physical controller.</summary>
-    public static IReadOnlyList<IGrouping<string, HidCandidate>> GroupByPhysicalDevice(
-        IEnumerable<HidCandidate> candidates) =>
-        candidates.GroupBy(c => c.PhysicalDeviceKey, StringComparer.OrdinalIgnoreCase).ToArray();
 
     private HidCandidate? Describe(HidDevice device, bool requireNintendoVendorId)
     {
@@ -94,6 +86,8 @@ public sealed class DeviceEnumerator
             return null;
         }
 
+        // Nintendo's vendor id is the only pre-filter. An unknown product id is still returned: newer
+        // controllers reuse the vendor id, and the protocol handshake is the real identity check.
         if (requireNintendoVendorId && vendorId != ProtocolConstants.NintendoVendorId)
         {
             return null;

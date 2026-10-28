@@ -92,6 +92,9 @@ public sealed class SwitchControllerSession : IDisposable
     private double _rumbleStrength;
     private bool _rehandshakePending;
     private bool _disposed;
+    private readonly object _stateGate = new();
+    private FullStateReport _latest;
+    private bool _hasState;
 
     public SwitchControllerSession(
         string deviceKey,
@@ -144,8 +147,42 @@ public sealed class SwitchControllerSession : IDisposable
     /// <summary>True when factory calibration was read successfully.</summary>
     public bool CalibrationLoaded { get; private set; }
 
-    /// <summary>Most recent decoded state.</summary>
-    public FullStateReport Latest { get; private set; }
+    /// <summary>
+    /// Most recent decoded state, copied under a lock because the state is larger than a machine word
+    /// and a torn read would show a momentary mix of two frames as a phantom input.
+    /// </summary>
+    public FullStateReport Latest
+    {
+        get
+        {
+            lock (_stateGate)
+            {
+                return _latest;
+            }
+        }
+    }
+
+    /// <summary>True once at least one full state report has been decoded.</summary>
+    public bool HasState
+    {
+        get
+        {
+            lock (_stateGate)
+            {
+                return _hasState;
+            }
+        }
+    }
+
+    /// <summary>Reads the latest state without tearing.</summary>
+    public bool TryGetLatest(out FullStateReport state)
+    {
+        lock (_stateGate)
+        {
+            state = _latest;
+            return _hasState;
+        }
+    }
 
     /// <summary>Player slot (1-4) currently mapped; drives the player lights.</summary>
     public int Slot { get; private set; } = 1;
@@ -331,7 +368,12 @@ public sealed class SwitchControllerSession : IDisposable
         _lastReportAt = now;
 
         Statistics.RecordReport(interval, _timeProvider.GetUtcNow());
-        Latest = state;
+        lock (_stateGate)
+        {
+            _latest = state;
+            _hasState = true;
+        }
+
 
         if (State == ControllerLinkState.Stale)
         {

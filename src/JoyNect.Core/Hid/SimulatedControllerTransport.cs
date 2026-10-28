@@ -76,12 +76,22 @@ public sealed class SimulatedControllerTransport : IControllerTransport
         BuildCalibrationImage();
     }
 
+    /// <summary>
+    /// The stick centre this controller reports in its calibration.
+    /// </summary>
+    /// <remarks>
+    /// The default stick position is this exact reading rather than the middle of the range, because
+    /// a real controller's calibrated centre is not at 2048. An idle simulated controller has to read
+    /// as perfectly centred, exactly as a real one does.
+    /// </remarks>
+    public static StickRaw CentredStick { get; } = new(0x79F, 0x8A0);
+
     /// <summary>Buttons the simulated controller is currently reporting.</summary>
     public SwitchButtons Buttons { get; set; }
 
-    public StickRaw LeftStick { get; set; } = new(StickRaw.Center, StickRaw.Center);
+    public StickRaw LeftStick { get; set; } = CentredStick;
 
-    public StickRaw RightStick { get; set; } = new(StickRaw.Center, StickRaw.Center);
+    public StickRaw RightStick { get; set; } = CentredStick;
 
     public byte BatteryAndConnection { get; set; } = 0x80;
 
@@ -336,8 +346,8 @@ public sealed class SimulatedControllerTransport : IControllerTransport
     private void BuildCalibrationImage()
     {
         // Stick calibration: documented Pro Controller values, packed into the reference layout.
-        WriteStick(0x603D, new StickRaw(0x4F7, 0x424), new StickRaw(0x79F, 0x8A0), new StickRaw(0x510, 0x479));
-        WriteStick(0x6046, new StickRaw(0x79F, 0x8A0), new StickRaw(0x510, 0x479), new StickRaw(0x4F7, 0x424));
+        WriteStick(0x603D, new StickRaw(0x4F7, 0x424), CentredStick, new StickRaw(0x510, 0x479));
+        WriteStick(0x6046, CentredStick, new StickRaw(0x510, 0x479), new StickRaw(0x4F7, 0x424));
 
         if (_options.CorruptCalibrationBlock)
         {
