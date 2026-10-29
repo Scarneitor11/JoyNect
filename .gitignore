@@ -46,3 +46,6 @@ node_modules/
 .venv/
 __pycache__/
 .env
+# Secret variants (release tokens, local overrides); the template .env.example stays tracked
+.env.*
+!.env.example
