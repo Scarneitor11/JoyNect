@@ -23,6 +23,7 @@ public sealed class TrayIconHost : IDisposable
     private readonly Action _open;
     private readonly Action _exit;
     private readonly Icon _appIcon;
+    private readonly System.Windows.Threading.Dispatcher _uiDispatcher;
     private bool _disposed;
 
     public TrayIconHost(IAppState state, Action open, Action exit)
@@ -32,6 +33,9 @@ public sealed class TrayIconHost : IDisposable
         _exit = exit;
 
         _appIcon = LoadIcon();
+        // Controller state changes are raised on reader/discovery threads; marshal UI touches to the
+        // dispatcher thread that owns the TaskbarIcon so we never touch DependencyObject state off-thread.
+        _uiDispatcher = System.Windows.Threading.Dispatcher.CurrentDispatcher;
         _menu = new ContextMenu
         {
             Placement = System.Windows.Controls.Primitives.PlacementMode.MousePoint,
@@ -61,12 +65,21 @@ public sealed class TrayIconHost : IDisposable
             return;
         }
 
+        // Controllers is thread-safe; only the DependencyObject touch (_icon.ToolTipText) needs the UI thread.
         var ready = _state.Controllers.Count(c => c.IsReady);
         var total = _state.Controllers.Count;
-
-        _icon.ToolTipText = _state.IsRunning
+        var text = _state.IsRunning
             ? $"JoyNect — {ready} of {total} controller{(total == 1 ? string.Empty : "s")} ready"
             : "JoyNect — paused";
+
+        if (_uiDispatcher.CheckAccess())
+        {
+            _icon.ToolTipText = text;
+        }
+        else
+        {
+            _uiDispatcher.BeginInvoke(new Action(() => _icon.ToolTipText = text));
+        }
     }
 
     /// <summary>Shows a balloon notification, used once when the window is hidden to the tray.</summary>

@@ -70,7 +70,7 @@ public sealed class AppState : IAppState
 
     public bool IsRunning => !_paused;
 
-    public MappingProfile Mapping => Pads.Count > 0 ? Pads[0].Profile : _template;
+    public MappingProfile Mapping => _template;
 
     public string SettingsPath => _store.FilePath;
 
@@ -335,9 +335,17 @@ public sealed class AppState : IAppState
         _remaps.Clear();
         _settings.Remaps.Clear();
 
+        // Restore every connected pad to its model-specific default button layout, then re-apply
+        // (now empty) remaps. Without this, connected pads kept their custom mappings after a reset.
         foreach (var pad in _manager.Pads)
         {
-            RefreshButtons(pad.Profile);
+            var model = pad.Sources.FirstOrDefault()?.Model.Model ?? SwitchModel.ProController;
+            var defaults = MappingProfile.CreateDefault(model, _settings.JoyConMode).Buttons;
+            pad.Profile.Buttons.Clear();
+            foreach (var kv in defaults)
+            {
+                pad.Profile.Buttons[kv.Key] = kv.Value;
+            }
         }
 
         _template = CreateTemplate();

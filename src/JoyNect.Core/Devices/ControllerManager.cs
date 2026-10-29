@@ -154,6 +154,42 @@ public sealed class ControllerManager : IDisposable
         _discoveryLoop = null;
         _cancellation?.Dispose();
         _cancellation = null;
+
+        // Stop every controller reader thread and clear device/pad bookkeeping so a subsequent
+        // Start() redisconnects cleanly instead of resuming against stale reader threads and
+        // disposed transports. Without this, Pause does not actually pause controller I/O.
+        TeardownRuntimesAndPads();
+    }
+
+    /// <summary>
+    /// Stops all device reader threads, disposes their transports/sessions and pads, and clears the
+    /// device and pad dictionaries. Used by both <see cref="Stop"/> (pause/resume) and
+    /// <see cref="Dispose"/> (shutdown).
+    /// </summary>
+    private void TeardownRuntimesAndPads()
+    {
+        DeviceRuntime[] runtimes;
+        PadBinding[] pads;
+        lock (_gate)
+        {
+            runtimes = _devices.Values.ToArray();
+            pads = _pads.Values.ToArray();
+            _devices.Clear();
+            _pads.Clear();
+            _bindingBySession.Clear();
+            _slotByController.Clear();
+        }
+
+        foreach (var runtime in runtimes)
+        {
+            StopRuntime(runtime);
+            runtime.Dispose();
+        }
+
+        foreach (var pad in pads)
+        {
+            pad.Dispose();
+        }
     }
 
     private void DiscoveryLoop(CancellationToken cancellationToken)
@@ -580,30 +616,7 @@ public sealed class ControllerManager : IDisposable
         }
 
         _disposed = true;
-        Stop();
-
-        DeviceRuntime[] runtimes;
-        PadBinding[] pads;
-        lock (_gate)
-        {
-            runtimes = _devices.Values.ToArray();
-            pads = _pads.Values.ToArray();
-            _devices.Clear();
-            _pads.Clear();
-            _bindingBySession.Clear();
-        }
-
-        foreach (var runtime in runtimes)
-        {
-            StopRuntime(runtime);
-            runtime.Dispose();
-        }
-
-        foreach (var pad in pads)
-        {
-            pad.Dispose();
-        }
-
+        Stop();  // stops discovery loop and tears down all runtimes/pads
         _backend.Dispose();
     }
 

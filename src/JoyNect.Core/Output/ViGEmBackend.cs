@@ -18,6 +18,7 @@ public sealed class ViGEmBackend : IVirtualPadBackend
 {
     private readonly ILogger _logger;
     private readonly List<ViGEmPad> _pads = [];
+    private readonly object _clientGate = new();
     private ViGEmClient? _client;
     private bool _disposed;
 
@@ -46,8 +47,12 @@ public sealed class ViGEmBackend : IVirtualPadBackend
 
         try
         {
-            _client ??= CreateClient();
-            var target = _client.CreateXbox360Controller();
+            ViGEmClient client;
+            lock (_clientGate)
+            {
+                client = _client ??= CreateClient();
+            }
+            var target = client.CreateXbox360Controller();
             var pad = new ViGEmPad(slot, description, target, _logger);
             pad.Connect();
             _pads.Add(pad);

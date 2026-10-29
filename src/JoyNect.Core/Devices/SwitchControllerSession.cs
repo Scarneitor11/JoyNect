@@ -86,9 +86,9 @@ public sealed class SwitchControllerSession : IDisposable
     private bool _sticksLoaded;
     private bool _imuLoaded;
     private byte _packetCounter;
-    private byte _playerLight;
-    private byte _requestedRumbleLarge;
-    private byte _requestedRumbleSmall;
+    private volatile byte _playerLight;
+    private volatile byte _requestedRumbleLarge;
+    private volatile byte _requestedRumbleSmall;
     private double _rumbleStrength;
     private bool _rehandshakePending;
     private bool _disposed;
@@ -185,7 +185,13 @@ public sealed class SwitchControllerSession : IDisposable
     }
 
     /// <summary>Player slot (1-4) currently mapped; drives the player lights.</summary>
-    public int Slot { get; private set; } = 1;
+    private volatile int _slot = 1;
+
+    public int Slot
+    {
+        get => _slot;
+        private set => _slot = value;
+    }
 
     /// <summary>
     /// Rumble strength multiplier in [0, 1], adjustable while the link runs.
