@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1">
-  <assemblyIdentity version="1.0.0.0" name="JoyNect.app" />
+  <assemblyIdentity version="1.1.0.0" name="JoyNect.app" />
 
   <!-- PerMonitorV2 keeps the Material 3 surfaces, 1px borders and shadows crisp on mixed-DPI
        setups and when the window is dragged between monitors at different scale factors. -->

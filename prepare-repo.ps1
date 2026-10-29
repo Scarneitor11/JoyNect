@@ -70,14 +70,14 @@ Remove-Item -Force "patterns.json" -ErrorAction SilentlyContinue
 dotnet restore
 dotnet publish src/JoyNect.App/JoyNect.App.csproj -c Release -r win-x64 --self-contained true -o publishes/win-x64 -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -p:IncludeAllContentForSelfExtract=true -p:EnableSourceLink=false -p:DebugType=none -p:DebugSymbols=false
 
-$zip = Join-Path $root "JoyNect-1.0.0-win-x64.zip"
+$zip = Join-Path $root "JoyNect-1.1.0-win-x64.zip"
 Remove-Item -Force $zip -ErrorAction SilentlyContinue
 Compress-Archive -Force -Path "publishes/win-x64/*" -DestinationPath $zip
 
 Write-Output ""
 Write-Output "Build outputs produced:"
 Write-Output "  publishes/win-x64/   self-contained executable and runtimes"
-Write-Output "  JoyNect-1.0.0-win-x64.zip"
+Write-Output "  JoyNect-1.1.0-win-x64.zip"
 Write-Output ""
 
 Write-Output "Current git status after the rebuild, exactly as reported by the repo:"
