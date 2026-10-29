@@ -533,18 +533,24 @@ public sealed class ControllerManager : IDisposable
                 _retryAfter[runtime.Candidate.PhysicalDeviceKey] = _timeProvider.GetUtcNow() + _options.RetryFailedDevicesAfter;
             }
 
-            try
-            {
-                runtime.Cancellation.Cancel();
-                runtime.Thread?.Wait(TimeSpan.FromSeconds(2));
-            }
-            catch (AggregateException)
-            {
-                // Expected when the loop is cancelled while it is reading.
-            }
+            StopRuntime(runtime);
 
             runtime.Dispose();
             RaiseChanged();
+        }
+    }
+
+    /// <summary>Stops a device's reader thread. It must finish before the transport is closed.</summary>
+    private static void StopRuntime(DeviceRuntime runtime)
+    {
+        try
+        {
+            runtime.Cancellation.Cancel();
+            runtime.Thread?.Wait(TimeSpan.FromSeconds(2));
+        }
+        catch (AggregateException)
+        {
+            // Expected when the loop is cancelled while it is reading.
         }
     }
 
@@ -589,6 +595,7 @@ public sealed class ControllerManager : IDisposable
 
         foreach (var runtime in runtimes)
         {
+            StopRuntime(runtime);
             runtime.Dispose();
         }
 

@@ -227,6 +227,91 @@ public sealed class ControllerManagerTests
         return condition();
     }
 
+    [Fact]
+    public async Task DisposingTheManagerStopsReadingBeforeTheTransportIsClosed()
+    {
+        // A device's reader thread must be stopped before its transport is closed. Otherwise the
+        // thread keeps reading and writing a device that has already been released.
+        var tracked = new List<DisposeAwareTransport>();
+        using var harness = new ManagerHarness
+        {
+            WrapTransport = inner =>
+            {
+                var wrapped = new DisposeAwareTransport(inner);
+                tracked.Add(wrapped);
+                return wrapped;
+            },
+        };
+
+        harness.AddController();
+        var manager = harness.Start();
+
+        // Make sure the reader is running before disposing, so the check is not vacuous.
+        await tracked[0].FirstRead.WaitAsync(TimeSpan.FromSeconds(5));
+
+        manager.Dispose();
+
+        // A fixed manager stops the reader before disposing the transport, so no call arrives and the
+        // bounded wait expires. The old code's reader keeps calling, which completes ReadAfterDispose.
+        await Task.WhenAny(tracked[0].ReadAfterDispose, Task.Delay(TimeSpan.FromSeconds(2)));
+
+        Assert.Equal(0, tracked[0].CallsAfterDispose);
+    }
+
+    /// <summary>
+    /// Counts reads and writes made after the transport was disposed. <see cref="FirstRead"/> signals that the
+    /// reader has started; <see cref="ReadAfterDispose"/> signals the first call made after disposal.
+    /// </summary>
+    private sealed class DisposeAwareTransport(IControllerTransport inner) : IControllerTransport
+    {
+        private readonly TaskCompletionSource _firstRead = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _readAfterDispose = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private volatile bool _disposed;
+        private int _callsAfterDispose;
+
+        public Task FirstRead => _firstRead.Task;
+
+        public Task ReadAfterDispose => _readAfterDispose.Task;
+
+        public int CallsAfterDispose => _callsAfterDispose;
+
+        public string Description => inner.Description;
+
+        public ConnectionKind Connection => inner.Connection;
+
+        public int MaxInputReportLength => inner.MaxInputReportLength;
+
+        public int OutputReportLength => inner.OutputReportLength;
+
+        public int Read(Span<byte> buffer, int timeoutMilliseconds)
+        {
+            _firstRead.TrySetResult();
+            Record();
+            return inner.Read(buffer, timeoutMilliseconds);
+        }
+
+        public void Write(ReadOnlySpan<byte> report)
+        {
+            Record();
+            inner.Write(report);
+        }
+
+        public void Dispose()
+        {
+            _disposed = true;
+            inner.Dispose();
+        }
+
+        private void Record()
+        {
+            if (_disposed)
+            {
+                System.Threading.Interlocked.Increment(ref _callsAfterDispose);
+                _readAfterDispose.TrySetResult();
+            }
+        }
+    }
+
     /// <summary>Discovery backed by a fixed list of simulated controllers.</summary>
     private sealed class ScriptedDiscovery : IDeviceDiscovery
     {
@@ -309,6 +394,9 @@ public sealed class ControllerManagerTests
 
         public RecordingBackend Backend { get; }
 
+        /// <summary>Lets a test interpose on the transport the manager is handed.</summary>
+        public Func<IControllerTransport, IControllerTransport>? WrapTransport { get; set; }
+
         private IVirtualPadBackend? ExternalBackend { get; }
 
         public SimulatedControllerTransport AddController(
@@ -349,7 +437,7 @@ public sealed class ControllerManagerTests
                     OutputReports = [new ReportInfo(0x01, OutputFrames.FrameLength, "output")],
                     PhysicalDeviceKey = HidDevicePath.PhysicalDeviceKey(path, 0x057E, productId),
                 },
-                transport);
+                WrapTransport?.Invoke(transport) ?? transport);
 
             return transport;
         }
