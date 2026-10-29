@@ -46,5 +46,7 @@ node_modules/
 .venv/
 __pycache__/
 .env
+.env.release
+.env.*
 # Local sponsored-runtime checkout cache from the Freebuff agent environment
 .freebuff/
