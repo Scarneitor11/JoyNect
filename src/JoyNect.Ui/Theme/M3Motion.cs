@@ -138,7 +138,20 @@ public static class M3Motion
     /// rather than twenty checks. When it is on, animations complete instantly instead of being
     /// skipped, so control state still ends up correct.
     /// </remarks>
-    public static bool ReducedMotion => SystemParameters.ClientAreaAnimation == false;
+    public static bool ReducedMotion => ReducedMotionOverride ?? SystemParameters.ClientAreaAnimation == false;
+
+    [ThreadStatic]
+    private static bool? _reducedMotionOverride;
+
+    /// <summary>
+    /// Forces reduced motion on or off on the current thread, for tests that switch it mid-session. Null
+    /// follows the system setting. Thread-local so parallel tests, each on its own UI thread, do not affect one another.
+    /// </summary>
+    public static bool? ReducedMotionOverride
+    {
+        get => _reducedMotionOverride;
+        set => _reducedMotionOverride = value;
+    }
 
     /// <summary>Creates an animation for a double property.</summary>
     public static DoubleAnimation Animate(

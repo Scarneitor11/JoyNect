@@ -232,12 +232,13 @@ public sealed class MainWindow : Window
         }
 
         _onboarding = new OnboardingOverlay(_state);
-        _onboarding.Completed += (_, _) => CloseOnboarding();
+        _onboarding.Completed += OnOnboardingCompleted;
         Grid.SetRowSpan(_onboarding, 2);
         _root.Children.Add(_onboarding);
         _onboarding.Focus();
-        _onboarding.Completed -= (_, _) => CloseOnboarding();
     }
+
+    private void OnOnboardingCompleted(object? sender, EventArgs e) => CloseOnboarding();
 
     /// <summary>Applies the current theme to the chrome; called when the theme changes.</summary>
     public void ApplyChrome()
@@ -546,6 +547,7 @@ public sealed class MainWindow : Window
             return;
         }
 
+        _onboarding.Completed -= OnOnboardingCompleted;
         _root.Children.Remove(_onboarding);
         _onboarding = null;
 

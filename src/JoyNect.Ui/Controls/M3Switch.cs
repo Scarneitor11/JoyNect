@@ -20,6 +20,15 @@ public sealed class M3Switch : M3Interactive
     private readonly Border _thumb;
     private readonly TranslateTransform _thumbOffset = new();
     private readonly Grid _layout = new();
+    private const double RestingThumbSize = 24.0;
+
+    // Unfrozen so each switch can tween its own colours; the shared theme brushes are frozen.
+    private readonly SolidColorBrush _trackFill = new();
+    private readonly SolidColorBrush _thumbFill = new();
+
+    // Until the constructor finishes, the first theme colours are set directly so the control does not
+    // flash from the brushes' default colour on its first paint.
+    private bool _built;
 
     public M3Switch()
     {
@@ -33,17 +42,19 @@ public sealed class M3Switch : M3Interactive
             Width = 52,
             Height = 32,
             CornerRadius = new CornerRadius(16),
+            Background = _trackFill,
             IsHitTestVisible = false,
         };
 
         _thumb = new Border
         {
-            Width = 24,
-            Height = 24,
-            CornerRadius = new CornerRadius(12),
+            Width = RestingThumbSize,
+            Height = RestingThumbSize,
+            CornerRadius = new CornerRadius(RestingThumbSize / 2.0),
             HorizontalAlignment = HorizontalAlignment.Left,
             VerticalAlignment = VerticalAlignment.Center,
             Margin = new Thickness(4, 0, 0, 0),
+            Background = _thumbFill,
             IsHitTestVisible = false,
             RenderTransform = _thumbOffset,
         };
@@ -55,6 +66,7 @@ public sealed class M3Switch : M3Interactive
 
         RefreshTheme();
         RefreshThumb();
+        _built = true;
     }
 
     /// <inheritdoc />
@@ -88,7 +100,7 @@ public sealed class M3Switch : M3Interactive
     protected override void OnMouseLeftButtonUp(System.Windows.Input.MouseButtonEventArgs e)
     {
         base.OnMouseLeftButtonUp(e);
-        AnimateThumbWidth(24);
+        AnimateThumbWidth(RestingThumbSize);
         RefreshThumb();
     }
 
@@ -96,7 +108,7 @@ public sealed class M3Switch : M3Interactive
     protected override void OnKeyUp(System.Windows.Input.KeyEventArgs e)
     {
         base.OnKeyUp(e);
-        AnimateThumbWidth(24);
+        AnimateThumbWidth(RestingThumbSize);
         RefreshThumb();
     }
 
@@ -115,13 +127,34 @@ public sealed class M3Switch : M3Interactive
         base.RefreshTheme();
 
         Fill.Background = Brushes.Transparent;
-        _track.Background = IsSelected ? theme.Primary : theme.SurfaceContainerHighest;
+        SetBrushColour(_trackFill, IsSelected ? theme.Primary.Color : theme.SurfaceContainerHighest.Color);
 
         // An unselected thumb is outlined rather than filled: that is what distinguishes "off" from
         // "disabled" at a glance.
-        _thumb.Background = IsSelected ? theme.OnPrimary : theme.OnSurfaceVariant;
+        SetBrushColour(_thumbFill, IsSelected ? theme.OnPrimary.Color : theme.OnSurfaceVariant.Color);
         _thumb.BorderThickness = new Thickness(0);
         RefreshThumb();
+    }
+
+    private void SetBrushColour(SolidColorBrush brush, Color colour)
+    {
+        if (!_built || M3Motion.ReducedMotion)
+        {
+            // A running animation overrides the local value, so clear it before snapping.
+            brush.BeginAnimation(SolidColorBrush.ColorProperty, null);
+            brush.Color = colour;
+            return;
+        }
+
+        // Starting from the current colour, so a toggle mid-fade reverses smoothly.
+        brush.BeginAnimation(
+            SolidColorBrush.ColorProperty,
+            new ColorAnimation
+            {
+                To = colour,
+                Duration = new Duration(TimeSpan.FromMilliseconds(M3Duration.Short4)),
+                EasingFunction = M3Easing.Standard,
+            });
     }
 
     private void RefreshThumb()
@@ -131,13 +164,17 @@ public sealed class M3Switch : M3Interactive
             return;
         }
 
-        var travel = Math.Max(Width - _thumb.Width - 8.0, 0.0);
+        // Travel uses the resting thumb size, not _thumb.Width: that value is mid-animation during a
+        // press, so reading it here would stop the thumb short of the track end.
+        var travel = Math.Max(Width - RestingThumbSize - 8.0, 0.0);
         var target = IsSelected ? travel : 0.0;
 
         _thumb.CornerRadius = new CornerRadius(_thumb.Width / 2.0);
 
         if (M3Motion.ReducedMotion)
         {
+            // A running animation overrides the local value, so clear it before snapping.
+            _thumbOffset.BeginAnimation(TranslateTransform.XProperty, null);
             _thumbOffset.X = target;
             return;
         }
@@ -155,6 +192,7 @@ public sealed class M3Switch : M3Interactive
 
         if (M3Motion.ReducedMotion)
         {
+            _thumb.BeginAnimation(FrameworkElement.WidthProperty, null);
             _thumb.Width = width;
             RefreshThumb();
             return;

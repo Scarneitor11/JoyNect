@@ -14,6 +14,9 @@ public sealed class CliOptions
 
     public string? OutputPath { get; private set; }
 
+    /// <summary>True when a flag that needs a value (such as <c>--out</c>) was given without one.</summary>
+    public bool MissingValue { get; private set; }
+
     /// <summary>Free-form trailing arguments, used by commands such as replay.</summary>
     public List<string> Positional { get; } = [];
 
@@ -68,6 +71,7 @@ public sealed class CliOptions
             }
         }
 
+        options.MissingValue = pending is not null;
         return options;
     }
 }

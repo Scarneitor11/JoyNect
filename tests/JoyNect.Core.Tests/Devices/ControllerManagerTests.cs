@@ -78,10 +78,15 @@ public sealed class ControllerManagerTests
         left.Buttons = SwitchButtons.Up;
         right.Buttons = SwitchButtons.A;
 
+        // The buttons are written after the sticks, so wait for all four inputs together. Waiting on
+        // the sticks alone can return before a report carrying the buttons has reached the pad.
         var pad = harness.Backend.Pads[0];
         Assert.True(
-            WaitFor(() => pad.LastState.LeftThumbX > 30000 && pad.LastState.RightThumbX < -30000),
-            $"sticks were L{pad.LastState.LeftThumbX} R{pad.LastState.RightThumbX}");
+            WaitFor(() => pad.LastState.LeftThumbX > 30000
+                && pad.LastState.RightThumbX < -30000
+                && pad.LastState.Buttons.HasFlag(Xbox360Buttons.DpadUp)
+                && pad.LastState.Buttons.HasFlag(Xbox360Buttons.B)),
+            $"sticks were L{pad.LastState.LeftThumbX} R{pad.LastState.RightThumbX}, buttons {pad.LastState.Buttons}");
 
         Assert.True(pad.LastState.Buttons.HasFlag(Xbox360Buttons.DpadUp));
         Assert.True(pad.LastState.Buttons.HasFlag(Xbox360Buttons.B));

@@ -23,15 +23,14 @@ internal sealed class DiagnosticsPage : AppPage
     private readonly StackPanel _hidList = new();
     private readonly Dictionary<string, TextBlock> _statistics = [];
     private readonly Dictionary<string, TextBlock> _rates = [];
-    private readonly TextBlock _driverSummary;
-    private readonly StackPanel _driverActions = new() { Orientation = Orientation.Horizontal };
+    private TextBlock _driverSummary = M3Typography.Create(string.Empty, M3Typography.BodyMedium);
+    private StackPanel _driverActions = new() { Orientation = Orientation.Horizontal };
     private bool _loadedHid;
     private bool _loading;
 
     public DiagnosticsPage()
         : base("diagnostics", "Diagnostics", "Driver, link quality and the HID interfaces behind the scenes.", M3Glyph.Pulse)
     {
-        _driverSummary = M3Typography.Create(string.Empty, M3Typography.BodyMedium);
     }
 
     public override void OnShown()
@@ -101,10 +100,10 @@ internal sealed class DiagnosticsPage : AppPage
         var theme = M3ThemeManager.Current;
         var available = State.Driver.Available;
 
-        _driverSummary.SetCurrentValue(TextBlock.TextProperty, State.Driver.Summary);
+        // Fresh controls per build: a rebuild must not re-parent elements the previous card still owns.
+        _driverSummary = M3Typography.Create(State.Driver.Summary, M3Typography.BodyMedium);
         _driverSummary.Foreground = theme.OnSurfaceVariant;
-
-        _driverActions.Children.Clear();
+        _driverActions = new StackPanel { Orientation = Orientation.Horizontal };
 
         var probe = new M3Button("Check again", M3ButtonVariant.Outlined, M3Glyph.Refresh);
         probe.Click += (_, _) =>
@@ -197,6 +196,9 @@ internal sealed class DiagnosticsPage : AppPage
 
     private UIElement BuildHidSection()
     {
+        // The list outlives a rebuild, so release it from the previous card before this one adopts it.
+        (_hidList.Parent as Panel)?.Children.Remove(_hidList);
+
         var content = new StackPanel();
         content.Children.Add(_hidList);
 

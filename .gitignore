@@ -46,6 +46,5 @@ node_modules/
 .venv/
 __pycache__/
 .env
-# Secret variants (release tokens, local overrides); the template .env.example stays tracked
-.env.*
-!.env.example
+# Local sponsored-runtime checkout cache from the Freebuff agent environment
+.freebuff/

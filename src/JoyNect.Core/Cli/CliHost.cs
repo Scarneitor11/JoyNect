@@ -58,6 +58,11 @@ public sealed class CliHost
     {
         var command = args.Length == 0 ? "ui" : args[0].TrimStart('-').ToLowerInvariant();
         var options = CliOptions.Parse(args.Skip(1));
+        if (options.MissingValue)
+        {
+            _error.WriteLine("error: --out needs a file path.");
+            return 2;
+        }
 
         try
         {

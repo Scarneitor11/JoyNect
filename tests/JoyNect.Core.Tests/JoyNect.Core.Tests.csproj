@@ -15,6 +15,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\JoyNect.Core\JoyNect.Core.csproj" />
+    <ProjectReference Include="..\..\src\JoyNect.Ui\JoyNect.Ui.csproj" />
   </ItemGroup>
 
   <ItemGroup>
