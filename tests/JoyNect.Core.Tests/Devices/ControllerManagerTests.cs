@@ -67,7 +67,7 @@ public sealed class ControllerManagerTests
         var right = harness.AddController(SwitchModel.JoyConRight, mac: 0x001122334466);
         using var manager = harness.Start();
 
-        Assert.True(WaitFor(() => harness.Backend.Pads.Count == 1), "a Joy-Con pair should become one pad");
+        Assert.True(WaitFor(() => manager.Pads.Count == 1), "a Joy-Con pair should become one pad");
 
         var binding = manager.Pads[0];
         Assert.True(WaitFor(() => binding.Sources.Count == 2), "both halves should feed the same pad");
@@ -80,7 +80,7 @@ public sealed class ControllerManagerTests
 
         // The buttons are written after the sticks, so wait for all four inputs together. Waiting on
         // the sticks alone can return before a report carrying the buttons has reached the pad.
-        var pad = harness.Backend.Pads[0];
+        var pad = harness.Backend.Pads.Single(p => p.Slot == binding.Slot);
         Assert.True(
             WaitFor(() => pad.LastState.LeftThumbX > 30000
                 && pad.LastState.RightThumbX < -30000

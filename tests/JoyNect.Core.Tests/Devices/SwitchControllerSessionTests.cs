@@ -86,7 +86,7 @@ public sealed class SwitchControllerSessionTests
         Assert.True(WaitFor(() => harness.Session.Latest.Buttons.Has(SwitchButtons.A), 3000));
         Assert.Equal(SwitchButtons.A | SwitchButtons.Zr | SwitchButtons.LeftStickClick, harness.Session.Latest.Buttons);
         Assert.Equal(new StickRaw(1200, 3000), harness.Session.Latest.LeftStick);
-        Assert.True(Volatile.Read(ref updates) > 0);
+        Assert.True(WaitFor(() => updates > 0, 3000), "StateUpdated was not raised after the input change");
     }
 
     [Fact]
