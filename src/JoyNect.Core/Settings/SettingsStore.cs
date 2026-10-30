@@ -24,6 +24,7 @@ public sealed class SettingsStore
 
     private readonly string _path;
     private readonly ILogger _logger;
+    private readonly object _saveGate = new();
 
     public SettingsStore(string path, ILogger? logger = null)
     {
@@ -41,6 +42,14 @@ public sealed class SettingsStore
 
     /// <summary>Loads the settings, falling back to defaults for anything missing or unreadable.</summary>
     public AppSettings Load()
+    {
+        lock (_saveGate)
+        {
+            return LoadUnlocked();
+        }
+    }
+
+    private AppSettings LoadUnlocked()
     {
         try
         {
@@ -72,24 +81,27 @@ public sealed class SettingsStore
     {
         ArgumentNullException.ThrowIfNull(settings);
 
-        try
+        lock (_saveGate)
         {
-            var directory = System.IO.Path.GetDirectoryName(_path);
-            if (!string.IsNullOrEmpty(directory))
+            try
             {
-                Directory.CreateDirectory(directory);
-            }
+                var directory = System.IO.Path.GetDirectoryName(_path);
+                if (!string.IsNullOrEmpty(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
 
-            var json = JsonSerializer.Serialize(settings.Normalise(), SerializerOptions);
-            var temporary = _path + ".tmp";
-            File.WriteAllText(temporary, json);
-            File.Move(temporary, _path, overwrite: true);
-            return true;
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            _logger.LogWarning(ex, "Could not save settings to {Path}", _path);
-            return false;
+                var json = JsonSerializer.Serialize(settings.Normalise(), SerializerOptions);
+                var temporary = _path + ".tmp";
+                File.WriteAllText(temporary, json);
+                File.Move(temporary, _path, overwrite: true);
+                return true;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                _logger.LogWarning(ex, "Could not save settings to {Path}", _path);
+                return false;
+            }
         }
     }
 
