@@ -80,7 +80,9 @@ public static class DriverProbe
                 Available = false,
                 Summary = issue.Summary,
                 Remediation = issue.Remediation,
-                Error = ex.Message,
+                // Do not echo raw exception text into the UI/diagnostic report: it can contain
+                // internal paths or module names. The full exception is already logged above.
+                Error = null,
             };
         }
         finally

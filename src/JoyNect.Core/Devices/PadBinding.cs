@@ -105,10 +105,12 @@ public sealed class PadBinding : IDisposable
         lock (_gate)
         {
             _sources[session] = new SourceEntry(layout, session.State == ControllerLinkState.Ready);
-        }
 
-        session.StateUpdated += OnSourceStateUpdated;
-        session.LinkStateChanged += OnSourceLinkStateChanged;
+            // Subscribe inside the gate so a concurrent RemoveSource cannot unsubscribe a handler
+            // that was never added, leaving a stale delegate the session holds to a dead binding.
+            session.StateUpdated += OnSourceStateUpdated;
+            session.LinkStateChanged += OnSourceLinkStateChanged;
+        }
 
         _logger.LogInformation(
             "Slot {Slot} now fed by {Controller} ({Layout})",
@@ -119,12 +121,14 @@ public sealed class PadBinding : IDisposable
 
     public void RemoveSource(SwitchControllerSession session)
     {
-        session.StateUpdated -= OnSourceStateUpdated;
-        session.LinkStateChanged -= OnSourceLinkStateChanged;
-
         bool empty;
         lock (_gate)
         {
+            // Unsubscribe inside the gate, mirroring AddSource, so the subscription lifetime is
+            // always bounded by the dictionary lifetime.
+            session.StateUpdated -= OnSourceStateUpdated;
+            session.LinkStateChanged -= OnSourceLinkStateChanged;
+
             _sources.Remove(session);
             empty = _sources.Count == 0;
             if (empty)

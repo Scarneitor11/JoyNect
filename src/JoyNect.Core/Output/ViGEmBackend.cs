@@ -161,9 +161,11 @@ internal sealed class ViGEmPad : IVirtualPad
     private readonly IXbox360Controller _target;
     private readonly ILogger _logger;
     private readonly object _gate = new();
+    private readonly object _disposeGate = new();
     private Xbox360PadState _lastSubmitted = Xbox360PadState.Neutral;
     private bool _submittedOnce;
     private long _lastSubmitTicks;
+    private bool _disposed;
 
     public ViGEmPad(int slot, string description, IXbox360Controller target, ILogger logger)
     {
@@ -242,6 +244,15 @@ internal sealed class ViGEmPad : IVirtualPad
 
     public void Dispose()
     {
+        lock (_disposeGate)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+            _disposed = true;
+        }
+
         lock (_gate)
         {
             try
