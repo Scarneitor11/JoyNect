@@ -92,6 +92,13 @@ public sealed class M3SegmentedButtons : Border
             _segments.Add(new Segment(labels[i], button));
         }
 
+        // Clamp the stale selection to the new segment count so a shrunk segment list never
+        // leaves _selectedIndex pointing at a segment that no longer exists.
+        if (_selectedIndex >= _segments.Count)
+        {
+            _selectedIndex = -1;
+        }
+
         UpdateSelectionVisuals();
         RefreshTheme();
     }

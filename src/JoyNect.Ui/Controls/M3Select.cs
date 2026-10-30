@@ -192,7 +192,8 @@ public sealed class M3Select : M3Interactive
         _popup.HorizontalOffset = 0;
         UpdateMenuTheme();
         _popup.IsOpen = true;
-        _highlighted = Math.Max(_options.IndexOf(_value), 0);
+        var index = _options.IndexOf(_value);
+        _highlighted = index >= 0 ? index : 0;
         UpdateHighlight();
     }
 

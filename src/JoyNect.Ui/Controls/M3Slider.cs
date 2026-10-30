@@ -86,9 +86,7 @@ public sealed class M3Slider : M3Interactive
             RenderTransform = _handleLayoutTransform,
         };
 
-        _handle.GetType()
-            .GetProperty("SnapsToDevicePixels", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public)
-            ?.SetValue(_handle, false);
+        _handle.SnapsToDevicePixels = false;
 
         _layout.Children.Add(_track);
         _layout.Children.Add(_active);
@@ -140,7 +138,7 @@ public sealed class M3Slider : M3Interactive
         set
         {
             var clamped = Math.Clamp(value, _minimum, Math.Max(_maximum, _minimum));
-            if (Math.Abs(clamped - _value) < double.Epsilon)
+            if (Math.Abs(clamped - _value) < 1e-6)
             {
                 return;
             }

@@ -259,7 +259,11 @@ public sealed class ControllerManager : IDisposable
                 continue;
             }
 
-            var device = group.First(d => d.Candidate.DevicePath == match.DevicePath);
+            var device = group.FirstOrDefault(d => d.Candidate.DevicePath == match.DevicePath);
+            if (device is null)
+            {
+                continue;
+            }
             Connect(device, match);
         }
     }

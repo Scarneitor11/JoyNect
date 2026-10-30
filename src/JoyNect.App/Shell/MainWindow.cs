@@ -302,7 +302,7 @@ public sealed class MainWindow : Window
 
     private FrameworkElement CreatePage(string key)
     {
-        if (key == "style")
+        if (string.Equals(key, "style", StringComparison.Ordinal))
         {
             return new StyleGuidePageHost();
         }

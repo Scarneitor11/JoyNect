@@ -169,7 +169,7 @@ public sealed class M3Switch : M3Interactive
         var travel = Math.Max(Width - RestingThumbSize - 8.0, 0.0);
         var target = IsSelected ? travel : 0.0;
 
-        _thumb.CornerRadius = new CornerRadius(_thumb.Width / 2.0);
+        _thumb.CornerRadius = new CornerRadius(RestingThumbSize / 2.0);
 
         if (M3Motion.ReducedMotion)
         {
