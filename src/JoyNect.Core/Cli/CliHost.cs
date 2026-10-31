@@ -26,7 +26,7 @@ public sealed class CliHost
         _logger = logger;
     }
 
-    public const string Version = "1.1.0";
+    public const string Version = "1.2.0";
 
     public static string HelpText =>
         """
