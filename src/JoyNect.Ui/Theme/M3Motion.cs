@@ -91,13 +91,10 @@ public static class M3Easing
     public static IEasingFunction StandardAccelerate { get; } = Freeze(new CubicBezierEasing(0.3, 0.0, 1.0, 1.0));
 
     /// <summary>The expressive curve: a long, confident settle.</summary>
-    public static IEasingFunction Emphasized { get; } = Freeze(new CubicBezierEasing(0.2, 0.0, 0.0, 1.0));
+    public static IEasingFunction Emphasized { get; } = Standard;
 
     /// <summary>Expressive easing for entrances.</summary>
     public static IEasingFunction EmphasizedDecelerate { get; } = Freeze(new CubicBezierEasing(0.05, 0.7, 0.1, 1.0));
-
-    /// <summary>Expressive easing for exits.</summary>
-    public static IEasingFunction EmphasizedAccelerate { get; } = Freeze(new CubicBezierEasing(0.3, 0.0, 0.8, 0.15));
 
     private static IEasingFunction Freeze(CubicBezierEasing easing)
     {
@@ -125,6 +122,9 @@ public static class M3Duration
     public const int ExtraLong2 = 800;
     public const int ExtraLong3 = 900;
     public const int ExtraLong4 = 1000;
+
+    /// <summary>Duration for an entrance animation.</summary>
+    public const int Entrance = 220;
 }
 
 /// <summary>Helpers that build Material motion animations.</summary>
@@ -176,14 +176,135 @@ public static class M3Motion
         return animation;
     }
 
-    /// <summary>Runs an animation on a freezable-friendly dependency object.</summary>
-    public static void Begin(
-        System.Windows.Media.Animation.Animatable target,
-        System.Windows.DependencyProperty property,
+    /// <summary>
+    /// Begins a <see cref="DoubleAnimation"/> on <paramref name="target"/>/<paramref name="property"/>
+    /// to <paramref name="to"/> after <paramref name="startDelayMs"/> milliseconds.
+    /// </summary>
+    /// <remarks>
+    /// When reduced motion is on the animation snaps: zero duration and zero begin time, so the
+    /// target reaches <paramref name="to"/> immediately.
+    /// </remarks>
+    public static void Stagger(
+        Animatable target,
+        DependencyProperty property,
         double to,
-        int durationMilliseconds = M3Duration.Short4,
+        int startDelayMs,
+        int durationMs = M3Duration.Short4,
         IEasingFunction? easing = null)
     {
-        target.BeginAnimation(property, Animate(to, durationMilliseconds, easing));
+        var animation = new DoubleAnimation
+        {
+            To = to,
+            Duration = new Duration(ReducedMotion ? TimeSpan.Zero : TimeSpan.FromMilliseconds(durationMs)),
+            EasingFunction = easing ?? M3Easing.Standard,
+            BeginTime = ReducedMotion ? TimeSpan.Zero : TimeSpan.FromMilliseconds(startDelayMs),
+            FillBehavior = FillBehavior.HoldEnd,
+        };
+
+        animation.Freeze();
+        target.BeginAnimation(property, animation);
+    }
+
+    /// <summary>
+    /// Staggered entrance preset: element <paramref name="index"/>
+    /// starts after <paramref name="index"/> * 40ms, over <see cref="M3Duration.Medium2"/>, with
+    /// <see cref="M3Easing.EmphasizedDecelerate"/>.
+    /// </summary>
+    public static void Entrance(
+        Animatable target,
+        DependencyProperty property,
+        double to,
+        int index)
+    {
+        Stagger(target, property, to, index * 40, M3Duration.Medium2, M3Easing.EmphasizedDecelerate);
+    }
+
+    /// <summary>
+    /// Staggered fade-in preset for an element's opacity, on the same timing as <see cref="Entrance"/>.
+    /// Under reduced motion it snaps to fully opaque with no delay.
+    /// </summary>
+    public static void EntranceFade(UIElement target, int index)
+    {
+        var animation = new DoubleAnimation
+        {
+            To = 1.0,
+            Duration = new Duration(ReducedMotion ? TimeSpan.Zero : TimeSpan.FromMilliseconds(M3Duration.Medium2)),
+            EasingFunction = M3Easing.EmphasizedDecelerate,
+            BeginTime = ReducedMotion ? TimeSpan.Zero : TimeSpan.FromMilliseconds(index * 40),
+            FillBehavior = FillBehavior.HoldEnd,
+        };
+
+        animation.Freeze();
+        target.BeginAnimation(UIElement.OpacityProperty, animation);
+    }
+
+    /// <summary>
+    /// Slides a sheet in from <paramref name="from"/> to rest (0) with the expressive entrance curve.
+    /// Under reduced motion the duration is zero, so the sheet snaps to rest.
+    /// </summary>
+    public static void SlideIn(Animatable target, DependencyProperty property, double from)
+    {
+        target.BeginAnimation(property, Animate(0.0, M3Duration.Medium2, M3Easing.EmphasizedDecelerate, from));
+    }
+
+    /// <summary>
+    /// Moves a selection indicator to <paramref name="to"/> with the standard curve over
+    /// <see cref="M3Duration.Medium2"/>. Under reduced motion <see cref="Animate"/> gives a zero duration,
+    /// so the indicator snaps with no travel.
+    /// </summary>
+    public static void SlideSelection(Animatable target, DependencyProperty property, double to)
+    {
+        target.BeginAnimation(property, Animate(to, M3Duration.Medium2, M3Easing.Standard));
+    }
+
+    /// <summary>
+    /// Fades a selection indicator to <paramref name="to"/> with the expressive curve over
+    /// <see cref="M3Duration.Short3"/>. Under reduced motion it snaps with no fade.
+    /// </summary>
+    public static void FadeSelection(UIElement target, double to)
+    {
+        target.BeginAnimation(UIElement.OpacityProperty, Animate(to, M3Duration.Short3, M3Easing.Emphasized));
+    }
+
+    /// <summary>Fades a sheet in to full opacity, using the entrance curve.</summary>
+    public static void FadeIn(UIElement target, DependencyProperty property)
+    {
+        target.BeginAnimation(property, Animate(1.0, M3Duration.Short4, M3Easing.StandardDecelerate, 0.0));
+    }
+
+    /// <summary>
+    /// Slides a sheet out to <paramref name="to"/> with the exit curve, then runs <paramref name="onCompleted"/>.
+    /// Under reduced motion the duration is zero, so <paramref name="onCompleted"/> fires on the next frame.
+    /// </summary>
+    public static void SlideOut(Animatable target, DependencyProperty property, double to, Action onCompleted)
+    {
+        var animation = new DoubleAnimation
+        {
+            To = to,
+            Duration = new Duration(TimeSpan.FromMilliseconds(ReducedMotion ? 0 : M3Duration.Short4)),
+            EasingFunction = M3Easing.StandardAccelerate,
+        };
+        animation.Completed += (_, _) => onCompleted();
+        target.BeginAnimation(property, animation);
+    }
+
+    /// <summary>
+    /// Fades a sheet out to transparent with the exit curve. Runs <paramref name="onCompleted"/> when it
+    /// finishes, if one is given.
+    /// </summary>
+    public static void FadeOut(UIElement target, DependencyProperty property, Action? onCompleted = null)
+    {
+        var animation = new DoubleAnimation
+        {
+            To = 0.0,
+            Duration = new Duration(TimeSpan.FromMilliseconds(ReducedMotion ? 0 : M3Duration.Short3)),
+            EasingFunction = M3Easing.StandardAccelerate,
+        };
+        if (onCompleted is not null)
+        {
+            animation.Completed += (_, _) => onCompleted();
+        }
+
+        target.BeginAnimation(property, animation);
     }
 }

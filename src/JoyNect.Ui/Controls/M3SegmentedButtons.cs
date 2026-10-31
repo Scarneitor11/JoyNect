@@ -12,12 +12,22 @@ namespace JoyNect.Ui.Controls;
 /// <remarks>
 /// Used wherever a small, mutually exclusive choice has to be visible at once — light or dark, one
 /// Joy-Con or two. Selection is managed here rather than by the caller so the group can never end up
-/// with two selected segments.
+/// with two selected segments. The selected segment is marked by a single indicator that slides from
+/// the old segment to the new one, so the segments themselves stay transparent over it.
 /// </remarks>
 public sealed class M3SegmentedButtons : Border
 {
     private readonly Grid _grid = new();
     private readonly List<Segment> _segments = [];
+    private readonly Border _indicator = new()
+    {
+        IsHitTestVisible = false,
+        HorizontalAlignment = HorizontalAlignment.Left,
+        VerticalAlignment = VerticalAlignment.Stretch,
+        Visibility = Visibility.Collapsed,
+    };
+
+    private readonly TranslateTransform _indicatorOffset = new();
     private int _selectedIndex = -1;
 
     public M3SegmentedButtons()
@@ -29,6 +39,8 @@ public sealed class M3SegmentedButtons : Border
         UseLayoutRounding = true;
         Child = _grid;
         HorizontalAlignment = HorizontalAlignment.Left;
+        _indicator.RenderTransform = _indicatorOffset;
+        _grid.SizeChanged += (_, _) => MoveIndicator(animate: false);
         RefreshTheme();
         Loaded += (_, _) => M3ThemeManager.Changed += OnThemeChanged;
         Unloaded += (_, _) => M3ThemeManager.Changed -= OnThemeChanged;
@@ -58,6 +70,7 @@ public sealed class M3SegmentedButtons : Border
             // Each button has an explicit appearance, so the fill has to be pushed to them here: the
             // selected-state colours are not something a button can derive from IsSelected alone.
             UpdateSelectionVisuals();
+            MoveIndicator(animate: true);
             SelectionChanged?.Invoke(this, EventArgs.Empty);
         }
     }
@@ -72,6 +85,7 @@ public sealed class M3SegmentedButtons : Border
         _grid.Children.Clear();
         _grid.ColumnDefinitions.Clear();
         _segments.Clear();
+        _grid.Children.Add(_indicator);
 
         for (var i = 0; i < labels.Length; i++)
         {
@@ -83,6 +97,7 @@ public sealed class M3SegmentedButtons : Border
                 HorizontalAlignment = HorizontalAlignment.Stretch,
                 VerticalAlignment = VerticalAlignment.Stretch,
                 Shape = M3ShapeToken.Small,
+                TransparentContainer = true,
             };
 
             button.Click += (_, _) => SelectedIndex = index;
@@ -101,6 +116,7 @@ public sealed class M3SegmentedButtons : Border
 
         UpdateSelectionVisuals();
         RefreshTheme();
+        MoveIndicator(animate: false);
     }
 
     /// <summary>Applies the theme and the selected/unselected appearance.</summary>
@@ -110,23 +126,57 @@ public sealed class M3SegmentedButtons : Border
         BorderBrush = theme.OutlineVariant;
         Background = theme.Surface;
         CornerRadius = new CornerRadius(Height / 2.0);
+        _indicator.Background = theme.Brush(ColorRole.SecondaryContainer);
 
         // A pill made of segments: the outer corners are round, the inner ones are square, so the
         // group reads as one control instead of a row of buttons.
         for (var i = 0; i < _segments.Count; i++)
         {
             var button = _segments[i].Button;
-            var radius = new CornerRadius(
-                i == 0 ? (Height / 2.0) - 1 : 0,
-                i == _segments.Count - 1 ? (Height / 2.0) - 1 : 0,
-                i == _segments.Count - 1 ? (Height / 2.0) - 1 : 0,
-                i == 0 ? (Height / 2.0) - 1 : 0);
-
             button.Shape = M3ShapeToken.None;
-            button.SetCornerOverride(radius);
+            button.SetCornerOverride(SegmentRadius(i));
         }
 
         UpdateSelectionVisuals();
+    }
+
+    private CornerRadius SegmentRadius(int index)
+    {
+        var end = (Height / 2.0) - 1;
+        var last = _segments.Count - 1;
+        return new CornerRadius(
+            index == 0 ? end : 0,
+            index == last ? end : 0,
+            index == last ? end : 0,
+            index == 0 ? end : 0);
+    }
+
+    // Moves the indicator to the selected column. Segments are equal star columns, so the offset is one
+    // column width per index. The slide only runs between two visible positions, and never under
+    // reduced motion, where the indicator jumps straight to its target.
+    private void MoveIndicator(bool animate)
+    {
+        if (_selectedIndex < 0 || _segments.Count == 0)
+        {
+            _indicator.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        var wasVisible = _indicator.Visibility == Visibility.Visible;
+        _indicator.Visibility = Visibility.Visible;
+        _indicator.CornerRadius = SegmentRadius(_selectedIndex);
+
+        var columnWidth = _grid.ActualWidth / _segments.Count;
+        _indicator.Width = columnWidth;
+        var target = _selectedIndex * columnWidth;
+        if (animate && wasVisible && !M3Motion.ReducedMotion)
+        {
+            M3Motion.SlideSelection(_indicatorOffset, TranslateTransform.XProperty, target);
+            return;
+        }
+
+        _indicatorOffset.BeginAnimation(TranslateTransform.XProperty, null);
+        _indicatorOffset.X = target;
     }
 
     private void UpdateSelectionVisuals()

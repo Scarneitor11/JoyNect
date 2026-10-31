@@ -1,9 +1,8 @@
 using System.Drawing;
 using System.Windows;
-using System.Windows.Controls;
 using Hardcodet.Wpf.TaskbarNotification;
 using JoyNect.App.Services;
-using JoyNect.Ui.Theme;
+using JoyNect.Ui.Controls;
 
 namespace JoyNect.App.Shell;
 
@@ -19,7 +18,7 @@ public sealed class TrayIconHost : IDisposable
 {
     private readonly IAppState _state;
     private readonly TaskbarIcon _icon;
-    private readonly ContextMenu _menu;
+    private readonly M3PopupMenu _menu = new();
     private readonly Action _open;
     private readonly Action _exit;
     private readonly Icon _appIcon;
@@ -36,23 +35,20 @@ public sealed class TrayIconHost : IDisposable
         // Controller state changes are raised on reader/discovery threads; marshal UI touches to the
         // dispatcher thread that owns the TaskbarIcon so we never touch DependencyObject state off-thread.
         _uiDispatcher = System.Windows.Threading.Dispatcher.CurrentDispatcher;
-        _menu = new ContextMenu
-        {
-            Placement = System.Windows.Controls.Primitives.PlacementMode.MousePoint,
-        };
-
-        _menu.Opened += (_, _) => BuildMenu();
-
         _icon = new TaskbarIcon
         {
             Icon = _appIcon,
-            ContextMenu = _menu,
             ToolTipText = "JoyNect",
             Visibility = Visibility.Visible,
         };
 
         _icon.TrayMouseDoubleClick += (_, _) => _open();
         _icon.TrayLeftMouseUp += (_, _) => _open();
+        _icon.TrayRightMouseUp += (_, _) =>
+        {
+            BuildMenu();
+            _menu.OpenAtPointer();
+        };
         _state.Changed += OnStateChanged;
         Refresh();
     }
@@ -104,6 +100,7 @@ public sealed class TrayIconHost : IDisposable
 
         _disposed = true;
         _state.Changed -= OnStateChanged;
+        _menu.Dispose();
         _icon.Dispose();
         _appIcon.Dispose();
     }
@@ -112,46 +109,22 @@ public sealed class TrayIconHost : IDisposable
 
     private void BuildMenu()
     {
-        var theme = M3ThemeManager.Current;
-
-        _menu.Background = theme.SurfaceContainerHigh;
-        _menu.Foreground = theme.OnSurface;
-        _menu.BorderBrush = theme.OutlineVariant;
-        _menu.Padding = new Thickness(4);
-        _menu.Items.Clear();
-
-        _menu.Items.Add(Item("Open JoyNect", _open));
-        _menu.Items.Add(Item(_state.IsRunning ? "Pause connecting" : "Resume connecting", () =>
-        {
-            _state.SetRunning(!_state.IsRunning);
-            Refresh();
-        }));
-
-        _menu.Items.Add(new Separator());
-
-        var scan = Item("Scan for controllers", _state.Rescan);
-        scan.IsEnabled = _state.IsRunning;
-        _menu.Items.Add(scan);
-
-        _menu.Items.Add(new Separator());
-        _menu.Items.Add(Item("Exit JoyNect", _exit));
-    }
-
-    private MenuItem Item(string header, Action action)
-    {
-        var theme = M3ThemeManager.Current;
-        var item = new MenuItem
-        {
-            Header = header,
-            FontFamily = M3Typography.Text,
-            FontSize = 13,
-            Padding = new Thickness(12, 7, 12, 7),
-            Background = theme.SurfaceContainerHigh,
-            Foreground = theme.OnSurface,
-        };
-
-        item.Click += (_, _) => action();
-        return item;
+        _menu.SetItems(
+        [
+            new M3MenuItem("Open JoyNect", _open, Icon: M3Glyph.Monitor),
+            new M3MenuItem(
+                _state.IsRunning ? "Pause connecting" : "Resume connecting",
+                () =>
+                {
+                    _state.SetRunning(!_state.IsRunning);
+                    Refresh();
+                },
+                Icon: _state.IsRunning ? M3Glyph.Power : M3Glyph.Play),
+            null,
+            new M3MenuItem("Scan for controllers", _state.Rescan, _state.IsRunning, M3Glyph.Refresh),
+            null,
+            new M3MenuItem("Exit JoyNect", _exit, Icon: M3Glyph.Close),
+        ]);
     }
 
     private static Icon LoadIcon()

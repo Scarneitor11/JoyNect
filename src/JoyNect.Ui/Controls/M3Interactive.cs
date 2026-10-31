@@ -5,7 +5,7 @@ using System.Windows.Automation.Provider;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Media.Animation;
+using System.Windows.Shapes;
 using JoyNect.Core.Design;
 using JoyNect.Ui.Theme;
 
@@ -29,14 +29,24 @@ namespace JoyNect.Ui.Controls;
 /// </remarks>
 public abstract class M3Interactive : Button
 {
-    private static readonly TimeSpan StateTransition = TimeSpan.FromMilliseconds(M3Duration.Short2);
-
     private readonly Grid _root = new();
     private readonly Border _focusRing;
     private readonly Border _fill;
     private readonly Border _stateLayer;
     private readonly Grid _host;
     private readonly ScaleTransform _pressScale = new(1.0, 1.0);
+    private readonly ScaleTransform _rippleScale = new(0.0, 0.0);
+    private readonly Ellipse _ripple = new()
+    {
+        IsHitTestVisible = false,
+        Opacity = 0.0,
+        RenderTransformOrigin = new Point(0.5, 0.5),
+        // Fill the control's bounds so the scaled ellipse has a size to paint; a shape with no size renders nothing.
+        Stretch = Stretch.Fill,
+        HorizontalAlignment = HorizontalAlignment.Stretch,
+        VerticalAlignment = VerticalAlignment.Stretch,
+    };
+    private readonly TranslateTransform _hostOffset = new();
 
     private ColorRole _containerRole = ColorRole.Primary;
     private ColorRole _stateLayerRole = ColorRole.OnSurface;
@@ -47,6 +57,7 @@ public abstract class M3Interactive : Button
 
     protected M3Interactive()
     {
+        _ripple.RenderTransform = _rippleScale;
         Template = M3Templates.ContentOnly;
         FocusVisualStyle = null;
         Focusable = true;
@@ -73,13 +84,21 @@ public abstract class M3Interactive : Button
         _host = new Grid
         {
             RenderTransformOrigin = new Point(0.5, 0.5),
-            RenderTransform = _pressScale,
+            RenderTransform = new TransformGroup
+            {
+                Children =
+                {
+                    _pressScale,
+                    _hostOffset,
+                },
+            },
             Margin = Padding,
         };
 
         _root.Children.Add(_focusRing);
         _root.Children.Add(_fill);
         _root.Children.Add(_stateLayer);
+        _root.Children.Add(_ripple);
         _root.Children.Add(_host);
         Content = _root;
 
@@ -168,6 +187,22 @@ public abstract class M3Interactive : Button
     /// </remarks>
     protected bool HasExplicitAppearance { get; private set; }
 
+    private bool _transparentContainer;
+
+    /// <summary>
+    /// When true the container paints nothing, so a control behind it shows through. A segmented group
+    /// uses this so its sliding selection indicator sits under the segments.
+    /// </summary>
+    public bool TransparentContainer
+    {
+        get => _transparentContainer;
+        set
+        {
+            _transparentContainer = value;
+            RefreshTheme();
+        }
+    }
+
     /// <summary>
     /// Sets the container and content roles together.
     /// </summary>
@@ -206,11 +241,12 @@ public abstract class M3Interactive : Button
     protected virtual void RefreshTheme()
     {
         var theme = M3ThemeManager.Current;
-        _fill.Background = theme.Brush(_containerRole);
+        _fill.Background = _transparentContainer ? Brushes.Transparent : theme.Brush(_containerRole);
         _stateLayer.Background = theme.Overlay(_stateLayerRole, 1.0);
         _focusRing.BorderBrush = theme.Primary;
         Opacity = IsEnabled ? 1.0 : 1.0;
         _host.Opacity = IsEnabled ? 1.0 : M3Theme.DisabledOpacity;
+        _ripple.Fill = _stateLayer.Background;
         UpdateCorners();
     }
 
@@ -263,6 +299,7 @@ public abstract class M3Interactive : Button
     {
         base.OnMouseLeftButtonDown(e);
         RefreshInteraction();
+        PlayPressRipple();
     }
 
     /// <inheritdoc />
@@ -270,6 +307,7 @@ public abstract class M3Interactive : Button
     {
         base.OnMouseLeftButtonUp(e);
         RefreshInteraction();
+        FadePressRipple();
     }
 
     /// <inheritdoc />
@@ -361,12 +399,85 @@ public abstract class M3Interactive : Button
             return;
         }
 
-        element.BeginAnimation(property, new DoubleAnimation
+        element.BeginAnimation(property, M3Motion.Animate(value, M3Duration.Short2, M3Easing.Standard));
+    }
+
+    /// <summary>Starts the press ripple: scale grows 0→1 and opacity fades 0→0.6.</summary>
+    private void PlayPressRipple()
+    {
+        if (!IsEnabled || !IsPressed)
         {
-            To = value,
-            Duration = M3Motion.ReducedMotion ? TimeSpan.Zero : StateTransition,
-            EasingFunction = M3Easing.Standard,
-        });
+            return;
+        }
+
+        if (M3Motion.ReducedMotion)
+        {
+            // No ripple tween: keep it hidden at its start state so no partial tween ever paints.
+            Snap(_rippleScale, ScaleTransform.ScaleXProperty, 0.0);
+            Snap(_rippleScale, ScaleTransform.ScaleYProperty, 0.0);
+            Snap(_ripple, UIElement.OpacityProperty, 0.0);
+            return;
+        }
+
+        var press = M3Motion.Animate(1.0, M3Duration.Short2, M3Easing.EmphasizedDecelerate);
+        _rippleScale.BeginAnimation(ScaleTransform.ScaleXProperty, press);
+        _rippleScale.BeginAnimation(ScaleTransform.ScaleYProperty, press);
+        _ripple.BeginAnimation(
+            UIElement.OpacityProperty,
+            M3Motion.Animate(0.6, M3Duration.Short2, M3Easing.EmphasizedDecelerate));
+    }
+
+    /// <summary>Fades the press ripple out on release.</summary>
+    private void FadePressRipple()
+    {
+        if (!IsEnabled)
+        {
+            return;
+        }
+
+        _ripple.BeginAnimation(UIElement.OpacityProperty, M3Motion.Animate(0.0, M3Duration.Short2));
+    }
+
+    /// <summary>Stops any running animation on the property and sets its value directly.</summary>
+    private static void Snap(UIElement element, DependencyProperty property, double value)
+    {
+        element.BeginAnimation(property, null);
+        element.SetValue(property, value);
+    }
+
+    /// <summary>Stops any running animation on the property and sets its value directly.</summary>
+    private static void Snap(System.Windows.Media.Animation.Animatable target, DependencyProperty property, double value)
+    {
+        target.BeginAnimation(property, null);
+        target.SetValue(property, value);
+    }
+
+    /// <summary>
+    /// Animates the control into view on its first load: the fill fades in and the content host
+    /// slides up from 8px offset to its final place.
+    /// </summary>
+    /// <remarks>
+    /// Derived controls call this from their first <see cref="FrameworkElement.Loaded"/> handling.
+    /// When reduced motion is on, both steps snap to their end state instead of tweening.
+    /// </remarks>
+    protected virtual void AnimateEntrance()
+    {
+        if (M3Motion.ReducedMotion)
+        {
+            Snap(_fill, UIElement.OpacityProperty, 1.0);
+            Snap(_hostOffset, TranslateTransform.YProperty, 0.0);
+            return;
+        }
+
+        _fill.Opacity = 0.0;
+        _fill.BeginAnimation(
+            UIElement.OpacityProperty,
+            M3Motion.Animate(1.0, M3Duration.Entrance, M3Easing.EmphasizedDecelerate));
+
+        _hostOffset.Y = 8.0;
+        _hostOffset.BeginAnimation(
+            TranslateTransform.YProperty,
+            M3Motion.Animate(0.0, M3Duration.Entrance, M3Easing.EmphasizedDecelerate, from: 8.0));
     }
 
     private void UpdateCorners()

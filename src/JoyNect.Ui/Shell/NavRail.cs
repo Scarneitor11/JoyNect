@@ -1,7 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
-using System.Windows.Media.Animation;
 using JoyNect.Core.Design;
 using JoyNect.Ui.Controls;
 using JoyNect.Ui.Theme;
@@ -24,6 +23,7 @@ public sealed class NavRail : Border
     private readonly StackPanel _bottom = new() { Orientation = Orientation.Vertical };
     private readonly List<NavRailButton> _buttons = [];
     private string _selectedKey = string.Empty;
+    private bool _entered;
 
     public NavRail()
     {
@@ -39,6 +39,13 @@ public sealed class NavRail : Border
         RefreshTheme();
         Loaded += (_, _) => M3ThemeManager.Changed += OnThemeChanged;
         Unloaded += (_, _) => M3ThemeManager.Changed -= OnThemeChanged;
+        Loaded += (_, _) =>
+        {
+            if (!_entered && _buttons.Count > 0)
+            {
+                PlayEntrance();
+            }
+        };
     }
 
     /// <summary>Raised when the user picks a destination.</summary>
@@ -78,6 +85,27 @@ public sealed class NavRail : Border
         if (_buttons.Count > 0 && string.IsNullOrEmpty(_selectedKey))
         {
             Select(_buttons[0].Destination.Key, raise: false);
+        }
+
+        if (IsLoaded && !_entered && _buttons.Count > 0)
+        {
+            PlayEntrance();
+        }
+    }
+
+    /// <summary>
+    /// Staggers the items in: each slides up and fades in on <see cref="M3Motion"/>'s entrance timing.
+    /// Runs once, when the items first appear.
+    /// </summary>
+    private void PlayEntrance()
+    {
+        _entered = true;
+        for (var i = 0; i < _buttons.Count; i++)
+        {
+            var button = _buttons[i];
+            button.Body.Opacity = 0.0;
+            M3Motion.Entrance(button.Slide, TranslateTransform.YProperty, 0.0, i);
+            M3Motion.EntranceFade(button.Body, i);
         }
     }
 
@@ -129,6 +157,7 @@ internal sealed class NavRailButton : M3Interactive
     public NavRailButton(NavDestination destination)
     {
         Destination = destination;
+        RenderTransform = Slide;
 
         Width = 72;
         Height = 56;
@@ -162,6 +191,7 @@ internal sealed class NavRailButton : M3Interactive
         _label.FontSize = 10.5;
 
         var layout = new Grid();
+        Body = layout;
         layout.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
@@ -180,6 +210,15 @@ internal sealed class NavRailButton : M3Interactive
 
     /// <summary>What this item opens.</summary>
     public NavDestination Destination { get; }
+
+    /// <summary>The entrance slide; starts 12 DIPs below rest.</summary>
+    public TranslateTransform Slide { get; } = new(0, 12);
+
+    /// <summary>
+    /// The icon and label layout. The entrance fade goes here, because the base control writes its own
+    /// opacity on every theme refresh.
+    /// </summary>
+    public Grid Body { get; }
 
     /// <inheritdoc />
     public void ApplyTheme() => RefreshTheme();
@@ -218,17 +257,6 @@ internal sealed class NavRailButton : M3Interactive
             return;
         }
 
-        if (M3Motion.ReducedMotion)
-        {
-            _pill.Opacity = target;
-            return;
-        }
-
-        _pill.BeginAnimation(
-            UIElement.OpacityProperty,
-            new DoubleAnimation(target, TimeSpan.FromMilliseconds(M3Duration.Short3))
-            {
-                EasingFunction = M3Easing.Emphasized,
-            });
+        M3Motion.FadeSelection(_pill, target);
     }
 }

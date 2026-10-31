@@ -27,6 +27,10 @@ public sealed class M3Select : M3Interactive
     private readonly StackPanel _menuItems = new();
     private readonly List<string> _options = [];
     private readonly List<M3Button> _buttons = [];
+    private readonly TranslateTransform _menuTransform = new();
+
+    /// <summary>How far above its rest position the sheet starts when it slides in, in device-independent pixels.</summary>
+    private const double SheetSlide = 12.0;
 
     private string _value = string.Empty;
     private int _highlighted = -1;
@@ -59,6 +63,7 @@ public sealed class M3Select : M3Interactive
             CornerRadius = new CornerRadius(M3Shape.Medium),
             Child = _menuItems,
             MinWidth = 180,
+            RenderTransform = _menuTransform,
         };
 
         _popup = new Popup
@@ -66,7 +71,7 @@ public sealed class M3Select : M3Interactive
             Placement = PlacementMode.Bottom,
             AllowsTransparency = true,
             StaysOpen = false,
-            PopupAnimation = M3Motion.ReducedMotion ? PopupAnimation.None : PopupAnimation.Fade,
+            PopupAnimation = PopupAnimation.None,
             Child = _menu,
             VerticalOffset = 4,
         };
@@ -74,6 +79,12 @@ public sealed class M3Select : M3Interactive
         _popup.Opened += (_, _) => UpdateMenuTheme();
         Click += (_, _) => ToggleMenu();
     }
+
+    /// <summary>The sheet's slide transform, exposed so tests can check that it moves.</summary>
+    public TranslateTransform MenuTransform => _menuTransform;
+
+    /// <summary>The sheet's opacity, exposed so tests can check that it fades.</summary>
+    public double MenuOpacity => _menu.Opacity;
 
     /// <summary>Raised when the chosen option changes.</summary>
     public event EventHandler? SelectionChanged;
@@ -191,14 +202,14 @@ public sealed class M3Select : M3Interactive
         _popup.PlacementTarget = this;
         _popup.HorizontalOffset = 0;
         UpdateMenuTheme();
-        _popup.IsOpen = true;
+        M3PopupSheet.OpenSheet(_popup, _menuTransform, _menu, SheetSlide);
         var index = _options.IndexOf(_value);
         _highlighted = index >= 0 ? index : 0;
         UpdateHighlight();
     }
 
     /// <summary>Closes the menu.</summary>
-    public void CloseMenu() => _popup.IsOpen = false;
+    public void CloseMenu() => M3PopupSheet.CloseSheet(_popup, _menuTransform, _menu, SheetSlide);
 
     /// <summary>Applies theme colours without recursing through <see cref="RefreshTheme"/>.</summary>
     private void UpdateMenuTheme()
@@ -244,9 +255,10 @@ public sealed class M3Select : M3Interactive
     {
         for (var i = 0; i < _buttons.Count; i++)
         {
+            var isHighlighted = i == _highlighted;
             _buttons[i].SetAppearance(
-                i == _highlighted ? ColorRole.SecondaryContainer : ColorRole.SurfaceContainerHigh,
-                i == _highlighted ? ColorRole.OnSecondaryContainer : ColorRole.OnSurface);
+                isHighlighted ? ColorRole.SecondaryContainer : ColorRole.SurfaceContainerHigh,
+                isHighlighted ? ColorRole.OnSecondaryContainer : ColorRole.OnSurface);
         }
     }
 
