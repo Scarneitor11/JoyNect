@@ -1,3 +1,4 @@
+using System.Threading;
 using JoyNect.Core.Hid;
 using JoyNect.Core.Protocol;
 using Microsoft.Extensions.Logging;
@@ -86,9 +87,9 @@ public sealed class SwitchControllerSession : IDisposable
     private bool _sticksLoaded;
     private bool _imuLoaded;
     private byte _packetCounter;
-    private volatile byte _playerLight;
-    private volatile byte _requestedRumbleLarge;
-    private volatile byte _requestedRumbleSmall;
+    private byte _playerLight;
+    private byte _requestedRumbleLarge;
+    private byte _requestedRumbleSmall;
     private double _rumbleStrength;
     private bool _rehandshakePending;
     private bool _disposed;
@@ -130,7 +131,12 @@ public sealed class SwitchControllerSession : IDisposable
 
     public int ProductId { get; }
 
-    public ControllerLinkState State { get; private set; } = ControllerLinkState.Idle;
+    private int _state = (int)ControllerLinkState.Idle;
+    public ControllerLinkState State
+    {
+        get => (ControllerLinkState)Volatile.Read(ref _state);
+        private set => Volatile.Write(ref _state, (int)value);
+    }
 
     /// <summary>Identity reported by the controller, available after the handshake.</summary>
     public DeviceInfo? Info { get; private set; }
@@ -184,13 +190,12 @@ public sealed class SwitchControllerSession : IDisposable
         }
     }
 
+    private int _slot = 1;
     /// <summary>Player slot (1-4) currently mapped; drives the player lights.</summary>
-    private volatile int _slot = 1;
-
     public int Slot
     {
-        get => _slot;
-        private set => _slot = value;
+        get => Volatile.Read(ref _slot);
+        private set => Volatile.Write(ref _slot, value);
     }
 
     /// <summary>
@@ -221,8 +226,8 @@ public sealed class SwitchControllerSession : IDisposable
     /// <summary>Requests rumble output. Safe to call from any thread.</summary>
     public void SetRumble(byte largeMotor, byte smallMotor)
     {
-        _requestedRumbleLarge = largeMotor;
-        _requestedRumbleSmall = smallMotor;
+        Volatile.Write(ref _requestedRumbleLarge, largeMotor);
+        Volatile.Write(ref _requestedRumbleSmall, smallMotor);
     }
 
     /// <summary>Sets the player slot; the lights are updated on the next loop iteration.</summary>
@@ -235,9 +240,9 @@ public sealed class SwitchControllerSession : IDisposable
 
         Slot = slot;
         var light = OutputFrames.PlayerLightForSlot(slot);
-        if (light != _playerLight)
+        if (light != Volatile.Read(ref _playerLight))
         {
-            _playerLight = light;
+            Volatile.Write(ref _playerLight, light);
             QueueSubcommand(ProtocolConstants.SubcommandSetPlayerLights, [light]);
         }
     }
@@ -591,8 +596,9 @@ public sealed class SwitchControllerSession : IDisposable
                 break;
 
             case HandshakeStep.PlayerLights:
-                _playerLight = OutputFrames.PlayerLightForSlot(Slot);
-                TryWriteFrame(ProtocolConstants.SubcommandSetPlayerLights, [_playerLight]);
+                var light = OutputFrames.PlayerLightForSlot(Slot);
+                Volatile.Write(ref _playerLight, light);
+                TryWriteFrame(ProtocolConstants.SubcommandSetPlayerLights, [light]);
                 break;
 
             case HandshakeStep.Calibration:
@@ -734,8 +740,8 @@ public sealed class SwitchControllerSession : IDisposable
     private void UpdateRumbleEncoding()
     {
         RumbleEncoder.EncodeBoth(
-            _requestedRumbleLarge,
-            _requestedRumbleSmall,
+            Volatile.Read(ref _requestedRumbleLarge),
+            Volatile.Read(ref _requestedRumbleSmall),
             RumbleStrength,
             _rumbleLeft,
             _rumbleRight);

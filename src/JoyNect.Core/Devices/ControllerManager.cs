@@ -561,21 +561,46 @@ public sealed class ControllerManager : IDisposable
 
         foreach (var runtime in dead)
         {
+            lock (_padGate)
+            lock (_gate)
+            {
+                if (!_devices.ContainsValue(runtime))
+                {
+                    continue;
+                }
+            }
+
             Detach(runtime.Session, "link ended");
 
             lock (_gate)
             {
-                _devices.Remove(runtime.Candidate.PhysicalDeviceKey);
+                if (!_devices.Remove(runtime.Candidate.PhysicalDeviceKey))
+                {
+                    continue;
+                }
 
                 // Forget the slot mapping so a reconnect can take the same player slot back.
-                _slotByController.Remove(runtime.Session.IdentityKey);
-                _slotByController.Remove(runtime.Session.DeviceKey);
+                try
+                {
+                    _slotByController.Remove(runtime.Session.IdentityKey);
+                    _slotByController.Remove(runtime.Session.DeviceKey);
+                }
+                catch
+                {
+                    // Session may be disposed
+                }
                 _retryAfter[runtime.Candidate.PhysicalDeviceKey] = _timeProvider.GetUtcNow() + _options.RetryFailedDevicesAfter;
             }
 
-            StopRuntime(runtime);
-
-            runtime.Dispose();
+            try
+            {
+                StopRuntime(runtime);
+                runtime.Dispose();
+            }
+            catch
+            {
+                // Best effort cleanup
+            }
             RaiseChanged();
         }
     }
@@ -620,8 +645,55 @@ public sealed class ControllerManager : IDisposable
         }
 
         _disposed = true;
-        Stop();  // stops discovery loop and tears down all runtimes/pads
-        _backend.Dispose();
+        Stop();
+
+        DeviceRuntime[] runtimes;
+        PadBinding[] pads;
+        lock (_padGate)
+        lock (_gate)
+        {
+            runtimes = _devices.Values.ToArray();
+            pads = _pads.Values.ToArray();
+            _devices.Clear();
+            _pads.Clear();
+            _bindingBySession.Clear();
+            _slotByController.Clear();
+            _retryAfter.Clear();
+        }
+
+        foreach (var runtime in runtimes)
+        {
+            try
+            {
+                StopRuntime(runtime);
+                runtime.Dispose();
+            }
+            catch
+            {
+                // Best effort cleanup
+            }
+        }
+
+        foreach (var pad in pads)
+        {
+            try
+            {
+                pad.Dispose();
+            }
+            catch
+            {
+                // Best effort cleanup
+            }
+        }
+
+        try
+        {
+            _backend.Dispose();
+        }
+        catch
+        {
+            // Best effort cleanup
+        }
     }
 
     private sealed class DeviceRuntime : IDisposable
